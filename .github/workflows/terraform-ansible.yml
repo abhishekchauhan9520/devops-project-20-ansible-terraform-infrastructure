@@ -1,0 +1,37 @@
+name: Terraform + Ansible Validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform format check
+        run: terraform fmt -check -recursive
+      - name: Terraform init and validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - name: Install Ansible and YAML tooling
+        run: |
+          python -m pip install --disable-pip-version-check ansible-core yamllint
+      - name: YAML validation
+        run: yamllint -s .
+      - name: Ansible syntax check
+        working-directory: ansible
+        run: ansible-playbook --syntax-check playbook.yml
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Deployment is intentionally manual and requires configured AWS credentials and SSH secrets."
